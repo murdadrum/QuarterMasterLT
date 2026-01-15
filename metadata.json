@@ -1,0 +1,5 @@
+{
+  "name": "QuarterMasterLT",
+  "description": "A high-performance monitoring dashboard for validating link status, API health, safety protocols, and connectivity across digital infrastructure.",
+  "requestFramePermissions": []
+}
