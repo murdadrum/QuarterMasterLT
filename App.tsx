@@ -4,19 +4,67 @@ import { INITIAL_ENDPOINTS } from './constants';
 import { Endpoint, HealthReport, EndpointStatus } from './types';
 import { EndpointCard } from './components/EndpointCard';
 import { HealthSummary } from './components/HealthSummary';
+import { CoverageMap } from './components/CoverageMap';
 import { getAIHealthAnalysis } from './services/geminiService';
+
+interface SectionProps {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  badge?: string | number;
+}
+
+const Section: React.FC<SectionProps> = ({ title, isOpen, onToggle, children, badge }) => (
+  <div className="border-b border-gray-100 dark:border-slate-800 last:border-b-0">
+    <button 
+      onClick={onToggle}
+      className="w-full py-4 flex items-center justify-between group focus:outline-none"
+    >
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-slate-400 group-hover:text-indigo-600 transition-colors">
+          {title}
+        </h2>
+        {badge !== undefined && (
+          <span className="text-[10px] bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full font-bold">
+            {badge}
+          </span>
+        )}
+      </div>
+      <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} 
+        fill="none" viewBox="0 0 24 24" stroke="currentColor"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    </button>
+    <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-[2000px] pb-6 opacity-100' : 'max-h-0 opacity-0'}`}>
+      {children}
+    </div>
+  </div>
+);
 
 const App: React.FC = () => {
   const [endpoints, setEndpoints] = useState<Endpoint[]>(INITIAL_ENDPOINTS);
   const [report, setReport] = useState<HealthReport | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [openSections, setOpenSections] = useState({
+    stats: true,
+    ai: true,
+    coverage: false,
+    monitoring: true,
+  });
   
-  // Theme state
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem('theme') === 'dark' || 
       (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
   });
+
+  const toggleSection = (section: keyof typeof openSections) => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   const triggerAnalysis = useCallback(async (currentEndpoints: Endpoint[]) => {
     setLoadingReport(true);
@@ -32,10 +80,8 @@ const App: React.FC = () => {
 
   const refreshStatuses = useCallback(() => {
     setRefreshing(true);
-    // Simulate real network check
     setTimeout(() => {
       setEndpoints(prev => prev.map(ep => {
-        // Randomly fluctuate latency and status for demo purposes
         const newLatency = ep.status !== EndpointStatus.OFFLINE 
           ? Math.max(10, ep.avgLatency + (Math.random() * 20 - 10)) 
           : 0;
@@ -55,10 +101,8 @@ const App: React.FC = () => {
     triggerAnalysis(endpoints);
     const interval = setInterval(refreshStatuses, 10000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [triggerAnalysis, refreshStatuses, endpoints]);
 
-  // Update theme on change
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -80,138 +124,89 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f8f9fb] dark:bg-slate-950 transition-colors duration-300">
-      {/* Navigation */}
-      <nav className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 sticky top-0 z-50 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center">
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  viewBox="0 0 24 24" 
-                  fill="currentColor" 
-                  className="w-8 h-8 text-indigo-600 dark:text-indigo-400 drop-shadow-sm"
-                >
-                  <path fillRule="evenodd" d="M12.53 16.28a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l2.47 2.47 4.97-4.97a.75.75 0 1 1 1.06 1.06l-5.5 5.5Z" clipRule="evenodd" />
-                  <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75-4.365-9.75-9.75-9.75ZM18.75 12a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">QuarterMaster<span className="text-indigo-600 dark:text-indigo-400">LT</span></span>
-            </div>
-            <div className="flex items-center gap-4 md:gap-6">
-              <div className="hidden md:flex items-center gap-6">
-                <a href="#" className="text-sm font-medium text-gray-600 dark:text-slate-300 hover:text-indigo-600">Dashboard</a>
-                <a href="#" className="text-sm font-medium text-gray-400 dark:text-slate-500 hover:text-indigo-600">Incidents</a>
-                <a href="#" className="text-sm font-medium text-gray-400 dark:text-slate-500 hover:text-indigo-600">Safety Logs</a>
-              </div>
-              
-              <button 
+      {/* Mini Nav */}
+      <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 sticky top-0 z-50">
+        <div className="max-w-xl mx-auto px-4 flex justify-between h-14 items-center">
+          <div className="flex items-center gap-2">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="3.5"
+              className="w-6 h-6 text-indigo-600 dark:text-indigo-400"
+            >
+              <polyline points="13 17 18 12 13 7"></polyline>
+              <polyline points="6 17 11 12 6 7"></polyline>
+            </svg>
+            <span className="text-md font-bold text-gray-900 dark:text-white">QM<span className="text-indigo-600">LT</span></span>
+          </div>
+          <div className="flex items-center gap-2">
+             <button 
                 onClick={toggleTheme}
-                className="p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700 transition-all"
-                aria-label="Toggle Dark Mode"
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800"
               >
-                {isDarkMode ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                  </svg>
-                )}
+                {isDarkMode ? '☀️' : '🌙'}
               </button>
-              
-              <button className="hidden sm:block bg-gray-900 dark:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 dark:hover:bg-indigo-500 transition-all">
-                + New Endpoint
+              <button onClick={refreshStatuses} className={`p-1.5 rounded-lg text-gray-400 ${refreshing ? 'animate-spin' : ''}`}>
+                🔄
               </button>
-            </div>
           </div>
         </div>
       </nav>
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
-        {/* Hero Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">System Overview</h1>
-            <p className="text-gray-500 dark:text-slate-400">Real-time validation of links, APIs, and infrastructure endpoints.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={refreshStatuses}
-              disabled={refreshing}
-              className={`flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-slate-800 rounded-lg text-sm font-semibold text-gray-600 dark:text-slate-300 bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all ${refreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {refreshing ? 'Refreshing...' : 'Refresh Status'}
-            </button>
-            <button 
-              onClick={() => triggerAnalysis(endpoints)}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50 rounded-lg text-sm font-semibold text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-all"
-            >
-              Analyze with Gemini
-            </button>
-          </div>
-        </div>
+      {/* Main Columnized Mobile View */}
+      <main className="flex-1 max-w-xl w-full mx-auto p-4 space-y-2">
+        
+        <header className="mb-6 pt-2">
+          <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Sentinel Hub</h1>
+          <p className="text-xs text-gray-500 dark:text-slate-500 uppercase font-bold mt-1">Status: {stats.online === stats.total ? 'Optimal' : 'Issues Detected'}</p>
+        </header>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { label: 'Total Endpoints', value: stats.total, icon: '🔍', color: 'bg-blue-500' },
-            { label: 'Operational', value: stats.online, icon: '✓', color: 'bg-green-500' },
-            { label: 'Degraded', value: stats.degraded, icon: '!', color: 'bg-yellow-500' },
-            { label: 'Critically Offline', value: stats.offline, icon: '✕', color: 'bg-red-500' },
-          ].map((stat, i) => (
-            <div key={i} className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] ${stat.color}`}>
-                  {stat.icon}
-                </span>
+        {/* Stats Strip */}
+        <Section title="Quick Stats" isOpen={openSections.stats} onToggle={() => toggleSection('stats')}>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: 'ALL', val: stats.total, color: 'bg-indigo-500' },
+              { label: 'UP', val: stats.online, color: 'bg-green-500' },
+              { label: 'DEG', val: stats.degraded, color: 'bg-yellow-500' },
+              { label: 'OFF', val: stats.offline, color: 'bg-red-500' },
+            ].map((s, i) => (
+              <div key={i} className="bg-white dark:bg-slate-900 p-2 rounded-lg border border-gray-100 dark:border-slate-800 text-center">
+                <span className="text-[10px] font-black text-gray-400 dark:text-slate-500 block mb-1 uppercase">{s.label}</span>
+                <span className="text-lg font-black text-gray-900 dark:text-white">{s.val}</span>
               </div>
-              <p className="text-2xl font-black text-gray-900 dark:text-white leading-none">{stat.value}</p>
-              <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase mt-2 tracking-widest">{stat.label}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* AI Insight Section */}
-        <HealthSummary report={report} loading={loadingReport} />
-
-        {/* Grid of Endpoints */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Active Monitoring</h2>
-            <div className="flex gap-2">
-              <button className="p-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-lg text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-                </svg>
-              </button>
-              <button className="p-2 bg-gray-100 dark:bg-indigo-600 border border-gray-200 dark:border-indigo-500 rounded-lg text-gray-900 dark:text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {endpoints.map((ep) => (
-              <EndpointCard key={ep.id} endpoint={ep} />
             ))}
           </div>
-        </div>
+        </Section>
+
+        {/* AI Insight */}
+        <Section title="AI Intelligence" isOpen={openSections.ai} onToggle={() => toggleSection('ai')}>
+          <HealthSummary report={report} loading={loadingReport} />
+        </Section>
+
+        {/* Coverage */}
+        <Section title="Infrastructure Map" isOpen={openSections.coverage} onToggle={() => toggleSection('coverage')} badge={8}>
+          <div className="scale-[0.9] origin-top">
+            <CoverageMap />
+          </div>
+        </Section>
+
+        {/* Monitoring Grid */}
+        <Section title="Endpoints" isOpen={openSections.monitoring} onToggle={() => toggleSection('monitoring')} badge={endpoints.length}>
+          <div className="space-y-4">
+            {endpoints.map((ep) => (
+              <div key={ep.id} className="scale-[0.98] origin-center">
+                <EndpointCard endpoint={ep} />
+              </div>
+            ))}
+          </div>
+        </Section>
+
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 py-8 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-sm text-gray-400 dark:text-slate-500 font-medium">
-            &copy; {new Date().getFullYear()} QuarterMasterLT Dashboard. Powered by Gemini Sentinel Intelligence.
-          </p>
-        </div>
+      <footer className="max-w-xl mx-auto w-full p-6 text-center text-[10px] text-gray-400 dark:text-slate-600 font-bold uppercase tracking-widest">
+        QuarterMasterLT &bull; Sentinel Node {stats.total}
       </footer>
     </div>
   );
